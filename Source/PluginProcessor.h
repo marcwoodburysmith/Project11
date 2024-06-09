@@ -10,6 +10,47 @@
 
 #include <JuceHeader.h>
 
+namespace FilterInfo
+{
+
+enum FilterType
+{
+    FirstOrderLowPass,
+    FirstOrderHighPass,
+    FirstOrderAllPass,
+    LowPass,
+    HighPass,
+    BandPass,
+    Notch,
+    AllPass,
+    LowShelf,
+    HighShelf,
+    Peak
+};
+
+inline const std::map<FilterInfo::FilterType, juce::String>& GetParams()
+{
+    static std::map<FilterInfo::FilterType, juce::String> params =
+    {
+        {FirstOrderLowPass, "FirstOrder LowPass"},
+        {FirstOrderHighPass, "FirstOrder HighPass"},
+        {FirstOrderAllPass, "FirstOrder AllPass"},
+        {LowPass, "LowPass"},
+        {HighPass, "HighPass"},
+        {BandPass, "BandPass"},
+        {Notch, "Notch"},
+        {AllPass, "Allpass"},
+        {LowShelf, "LowShelf"},
+        {HighShelf, "HighShelf"},
+        {Peak, "Peak"}
+    };
+
+    return params;
+}
+
+
+} //end namespace FilterInfo
+
 //==============================================================================
 /**
 */
