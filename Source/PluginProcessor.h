@@ -78,7 +78,13 @@ struct FilterParametersBase
     bool bypassed {false};
     float quality {1.f};
     double sampleRate {44100};
+    
 };
+
+inline bool operator==(const FilterParametersBase& lhs, const FilterParametersBase& rhs)
+{
+    return ( lhs.frequency == rhs.frequency && lhs.quality == rhs.quality );
+}
 
 struct FilterParameters : public FilterParametersBase
 {
@@ -87,13 +93,24 @@ struct FilterParameters : public FilterParametersBase
     
 };
 
+inline bool operator==(const FilterParameters& lhs, const FilterParameters& rhs)
+{
+    return (lhs.frequency == rhs.frequency && lhs.quality == rhs.quality &&
+            static_cast<FilterParametersBase>(lhs) == static_cast<FilterParametersBase>(rhs) );
+}
 
 struct HighCutLowCutParameters : public FilterParametersBase
 {
     int order {1};
-    bool IsLowcut {true};
+    bool isLowcut {true};
     
 };
+
+inline bool operator==(const HighCutLowCutParameters& lhs, const HighCutLowCutParameters& rhs)
+{
+    return (lhs.order == rhs.order && lhs.isLowcut == rhs.isLowcut && static_cast<FilterParametersBase>(lhs) == static_cast<FilterParametersBase>(rhs) );
+}
+
 
 
 //==============================================================================
@@ -140,7 +157,7 @@ static auto makeCoefficients(FilterParameters filterParams)
  */
 static auto makeCoefficients(HighCutLowCutParameters highLowParams)
 {
-    if (highLowParams.IsLowcut)
+    if (highLowParams.isLowcut)
     {
         return juce::dsp::FilterDesign<float>::designIIRHighpassHighOrderButterworthMethod (highLowParams.frequency, highLowParams.sampleRate, highLowParams.order);
     }
@@ -222,8 +239,22 @@ public:
     juce::AudioProcessorValueTreeState apvts {*this, nullptr, "Parameters", createParameterLayout() };
     
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+    
+    void updateFilterParams();
 
 private:
+    
+    using Filter = juce::dsp::IIR::Filter<float>;
+    
+    using Filterchain = juce::dsp::ProcessorChain<Filter>;
+    
+    Filterchain leftChain, rightChain;
+    
+    HighCutLowCutParameters existingHighLow;
+    FilterParameters existingFilterParams;
+    
+    
+    
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Project11AudioProcessor)
 };

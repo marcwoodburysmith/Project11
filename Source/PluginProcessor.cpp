@@ -44,7 +44,61 @@ juce::String generateBypassParamString(int filterNum)
     return ParamString("bypass",filterNum);
 }
 
+//==============================================================================
 
+
+void Project11AudioProcessor::updateFilterParams()
+{
+    using namespace FilterInfo;
+    
+    float freq = apvts.getRawParameterValue(generateFreqParamString(0))->load();
+    float q = apvts.getRawParameterValue(generateQParamString(0))->load();
+    float gain = apvts.getRawParameterValue(generateGainParamString(0))->load();
+    auto type = apvts.getRawParameterValue(generateTypeParamString(0))->load();
+    auto bypass = apvts.getRawParameterValue(generateBypassParamString(0))->load() > 0.5f;
+
+
+    if ( type == LowPass || type == HighPass )
+    {
+        HighCutLowCutParameters highLow;
+        highLow.frequency = freq;
+        highLow.quality = q;
+        highLow.bypassed = bypass;
+        
+        if (!( highLow == existingHighLow ))
+        {
+            auto chainCoefficients = makeCoefficients(highLow);
+            
+            *(leftChain.get<0>().coefficients) = *(chainCoefficients[0]);
+            *(rightChain.get<0>().coefficients) = *(chainCoefficients[0]);
+            
+            leftChain.setBypassed<0>(bypass);
+            rightChain.setBypassed<0>(bypass);
+            
+        }
+        existingHighLow = highLow;
+
+    }
+    else
+    {
+        FilterParameters filterParams;
+        filterParams.frequency = freq;
+        filterParams.quality = q;
+        filterParams.gainInDecibels = gain;
+        filterParams.bypassed = bypass;
+        if (!( filterParams == existingFilterParams ))
+        {
+            auto chainCoefficients = makeCoefficients(filterParams);
+            *(leftChain.get<0>().coefficients) = *chainCoefficients;
+            *(rightChain.get<0>().coefficients) = *chainCoefficients;
+            
+            leftChain.setBypassed<0>(bypass);
+            rightChain.setBypassed<0>(bypass);
+            
+        }
+        existingFilterParams = filterParams;
+    }
+}
 
 //==============================================================================
 Project11AudioProcessor::Project11AudioProcessor()
@@ -69,7 +123,7 @@ Project11AudioProcessor::~Project11AudioProcessor()
 
 juce::AudioProcessorValueTreeState::ParameterLayout Project11AudioProcessor::createParameterLayout()
 {
-    const auto& params = FilterInfo::GetParams();
+//    const auto& params = FilterInfo::GetParams();
     
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
     
@@ -192,6 +246,13 @@ void Project11AudioProcessor::prepareToPlay (double sampleRate, int samplesPerBl
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate = sampleRate;
+    spec.maximumBlockSize = samplesPerBlock;
+    spec.numChannels = getTotalNumOutputChannels();
+    
+    leftChain.prepare(spec);
+    rightChain.prepare(spec);
 }
 
 void Project11AudioProcessor::releaseResources()
@@ -231,7 +292,7 @@ void Project11AudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
-
+    
     // In case we have more outputs than inputs, this code clears any output
     // channels that didn't contain input data, (because these aren't
     // guaranteed to be empty - they may contain garbage).
@@ -240,19 +301,43 @@ void Project11AudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     // this code if your algorithm always overwrites all the output channels.
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
-
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
-
-        // ..do something to the data...
-    }
+    
+    /*
+     TO DO
+     UpdateFilters() Function:
+     1. Get parameter settings (need getParameterSettings() function)
+     2. Store these in appropriate struct
+        (need if (LowCutHighCut) {}
+                else {}
+        )
+     3. Compare with prevous parameter values
+     4. If different recalculate coeffificents, if not don't
+     5. update leftChain and rightChain coefficients (leftChain.get<0>().coefficients = *coefficients)
+     */
+    
+//    const auto& params = FilterInfo::GetParams();
+    using namespace FilterInfo;
+    
+    updateFilterParams();
+    
+    juce::dsp::AudioBlock<float> block(buffer);
+    
+    auto leftBlock = block.getSingleChannelBlock(0);
+    auto rightBlock = block.getSingleChannelBlock(1);
+    
+    juce::dsp::ProcessContextReplacing<float> leftContext(leftBlock);
+    juce::dsp::ProcessContextReplacing<float> rightContext(rightBlock);
+    
+    leftChain.process(leftContext);
+    rightChain.process(rightContext);
+    
+    
+    
+//    Accessing map examples:
+//    float freq = apvts.getRawParameterValue(params.at(FirstOrderLowPass))->load();
+//    float freq = apvts.getRawParameterValue("FirstOrderLowPass")->load();
+//    float freq = apvts.getRawParameterValue(filterToString.at(FirstOrderLowPass))->load();
+    
 }
 
 //==============================================================================
@@ -273,12 +358,18 @@ void Project11AudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     // You should use this method to store your parameters in the memory block.
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
+    copyXmlToBinary(*apvts.copyState().createXml(), destData);
 }
 
 void Project11AudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
+    std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
+    if ( xml.get() != nullptr && xml->hasTagName(apvts.state.getType()))
+    {
+        apvts.replaceState(juce::ValueTree::fromXml(*xml));
+    }
 }
 
 //==============================================================================
