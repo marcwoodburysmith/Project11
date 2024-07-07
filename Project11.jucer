@@ -4,6 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" companyName="W-S Audio Design">
   <MAINGROUP id="z6lF51" name="Project11">
     <GROUP id="{0448FD5E-8C65-A41E-AA2F-2ECF83F5FAED}" name="Source">
+      <FILE id="xYds3T" name="Decibel.h" compile="0" resource="0" file="Source/Decibel.h"/>
       <FILE id="g2Bmkb" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
       <FILE id="WaDPky" name="PluginProcessor.h" compile="0" resource="0"
