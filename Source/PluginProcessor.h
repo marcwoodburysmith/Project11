@@ -12,6 +12,7 @@
 
 //==============================================================================
 
+//This will be the FIFO used to pass audio buffers between threads
 template<typename T, size_t Size>
 struct Fifo
 {
